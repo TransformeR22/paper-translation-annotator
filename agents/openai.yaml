@@ -1,0 +1,3 @@
+display_name: Paper Translation Annotator
+short_description: Translate paper PDF URLs into annotated Chinese Markdown.
+default_prompt: "Translate this paper PDF URL into annotated Chinese Markdown with highlighted explanations: "
