@@ -28,5 +28,23 @@ $paper-translation-annotator https://arxiv.org/pdf/1706.03762
 
 `examples/` 目录包含两篇已生成的翻译示例，并带有对应的图表资产：
 
-- `examples/attention-is-all-you-need.md`
-- `examples/explainable-token-level-noise-filtering.md`
+- [examples/attention-is-all-you-need.md](examples/attention-is-all-you-need.md)
+- [examples/explainable-token-level-noise-filtering.md](examples/explainable-token-level-noise-filtering.md)
+
+## 导出 PDF
+
+GitHub 对 Markdown callout、LaTeX 公式和本地图表的渲染不一定稳定。可以使用内置脚本把翻译结果导出为 HTML 和 PDF：
+
+```bash
+python3 scripts/export_markdown_pdf.py examples/attention-is-all-you-need.md -o examples/attention-is-all-you-need.pdf
+```
+
+脚本会自动处理本地图表路径、callout 高亮样式和 LaTeX 数学公式。若本机安装了 Chrome/Chromium 或 WeasyPrint，会自动生成 PDF；否则会先生成 HTML，并提示需要安装的 PDF 渲染器。
+
+推荐安装 WeasyPrint 作为 PDF 后端：
+
+```bash
+python3 -m pip install markdown weasyprint
+```
+
+如果不安装额外依赖，脚本仍会生成同名 HTML；可以在浏览器中打开 HTML 后手动打印为 PDF。

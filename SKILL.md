@@ -17,6 +17,7 @@ Create a reader-friendly Chinese Markdown translation of an English academic pap
 6. Rewrite formulas, variables, Greek letters, superscripts/subscripts, matrices, and complexity expressions in LaTeX math or another high-fidelity Markdown-renderable math format.
 7. Add annotations only where they help comprehension.
 8. Save the final Markdown under the requested output path, or under `outputs/` when the user wants a deliverable. Save extracted visual assets under a sibling folder such as `outputs/assets/<paper-slug>/`.
+9. When the user wants GitHub-friendly display or a shareable artifact, export the final Markdown to PDF with `scripts/export_markdown_pdf.py`.
 
 ## Source Preparation
 
@@ -39,9 +40,27 @@ The script produces:
 - `source.pdf` when input is a URL
 - `extracted.md` with page-delimited extracted text
 - `metadata.json` with source URL, page count, extraction warnings, and paths
-- `translation_skeleton.md` with the required output structure and color legend
+- `translation_skeleton.md` with the required output structure
 
 If extraction quality is poor, tell the user plainly and choose the best fallback: OCR request, arXiv source, publisher HTML, or a partial translation.
+
+## PDF Export
+
+GitHub Markdown may not render callouts, LaTeX math, or local paper assets consistently. When a stable visual artifact is needed, run:
+
+```bash
+python3 <skill-dir>/scripts/export_markdown_pdf.py "<translated.md>" -o "<translated.pdf>"
+```
+
+The export script:
+
+- rewrites local image links to file URLs so figure and table assets can render in the PDF;
+- converts Markdown callouts into styled highlighted blocks;
+- loads MathJax in the generated HTML so LaTeX math can render before printing;
+- writes a sibling HTML file for debugging and browser preview;
+- exports PDF automatically when WeasyPrint or Chrome/Chromium is available.
+
+If no PDF renderer is available, the script still writes HTML and tells the user which dependency is missing. In that case, ask the user to install Chrome/Chromium or WeasyPrint, or open the generated HTML in a browser and print to PDF.
 
 ## Figure, Table, And Layout Preservation
 
@@ -156,6 +175,7 @@ Before final delivery, check:
 - Section order matches the source paper as closely as extraction allows.
 - Figures, tables, captions, and equations appear near their source discussion rather than being reduced to end notes only.
 - Visual assets referenced by Markdown image links exist locally and use stable relative paths.
+- If a PDF artifact is requested, `scripts/export_markdown_pdf.py` runs successfully or at least produces an HTML preview with a clear dependency note.
 - Display equations are valid LaTeX/high-fidelity math, and inline variables use math markup where useful.
 - Every major claim remains linked to its source section, citation, figure, table, or equation where available.
 - Limitations and uncertainty are marked in red, not hidden in neutral prose.
@@ -163,3 +183,4 @@ Before final delivery, check:
 ## References
 
 - `references/annotation-style.md` - callout type meaning, good annotation targets, and annotation density guidance.
+- `scripts/export_markdown_pdf.py` - convert translated Markdown into styled HTML and PDF for stable sharing when GitHub rendering is insufficient.
