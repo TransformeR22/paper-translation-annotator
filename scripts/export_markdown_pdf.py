@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Export a translated Markdown paper to PDF-friendly HTML and PDF."""
+"""Export a translated Markdown paper to PDF."""
 
 from __future__ import annotations
 
@@ -47,6 +47,22 @@ def rewrite_image_paths(markdown_text: str, base_dir: Path) -> str:
     return re.sub(r"!\[([^\]]*)\]\(([^)]+)\)", replace, markdown_text)
 
 
+def markdown_has_math(markdown_text: str) -> bool:
+    return bool(
+        re.search(r"(?m)^```math\s*$", markdown_text)
+        or re.search(r"(?s)\$\$.*?\$\$", markdown_text)
+        or re.search(r"(?<!\\)\$[^$\n]+(?<!\\)\$", markdown_text)
+    )
+
+
+def normalize_math_fences(markdown_text: str) -> str:
+    def replace(match: re.Match[str]) -> str:
+        body = match.group(1).strip("\n")
+        return f"\n$$\n{body}\n$$\n"
+
+    return re.sub(r"(?ms)^```math\s*\n(.*?)\n```\s*$", replace, markdown_text)
+
+
 def inline_markdown(text: str) -> str:
     escaped = html.escape(text, quote=False)
     escaped = re.sub(r"!\[([^\]]*)\]\(([^)]+)\)", r'<img src="\2" alt="\1">', escaped)
@@ -58,6 +74,7 @@ def inline_markdown(text: str) -> str:
 
 
 def markdown_to_html(markdown_text: str) -> str:
+    markdown_text = normalize_math_fences(markdown_text)
     try:
         import markdown  # type: ignore
     except Exception:
@@ -207,6 +224,16 @@ window.MathJax = {{
 }};
 </script>
 <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+<script>
+window.addEventListener('load', () => {{
+  const markReady = () => document.body.setAttribute('data-mathjax-ready', 'true');
+  if (window.MathJax && window.MathJax.typesetPromise) {{
+    window.MathJax.typesetPromise().then(markReady).catch(markReady);
+  }} else {{
+    markReady();
+  }}
+}});
+</script>
 <style>
 @page {{ size: A4; margin: 20mm 17mm; }}
 :root {{
@@ -302,22 +329,43 @@ def export_with_chrome(html_path: Path, pdf_path: Path, timeout: int) -> bool:
         "--headless",
         "--disable-gpu",
         "--disable-extensions",
+        "--disable-background-networking",
+        "--disable-component-update",
+        "--disable-sync",
+        "--disable-translate",
         "--no-first-run",
         "--no-default-browser-check",
         "--allow-file-access-from-files",
         "--no-pdf-header-footer",
+        "--run-all-compositor-stages-before-draw",
         f"--user-data-dir={profile_dir}",
-        "--virtual-time-budget=5000",
+        "--virtual-time-budget=10000",
         f"--print-to-pdf={pdf_path}",
         html_path.as_uri(),
     ]
+    output_was_written = False
     try:
         subprocess.run(command, check=True, timeout=timeout)
+        output_was_written = pdf_path.exists() and pdf_path.stat().st_size > 1024
         return True
     except subprocess.TimeoutExpired:
-        print(f"Chrome/Chromium PDF export timed out after {timeout}s.", file=sys.stderr)
+        output_was_written = pdf_path.exists() and pdf_path.stat().st_size > 1024
+        if output_was_written:
+            print(
+                f"Chrome/Chromium did not exit within {timeout}s, but a PDF was written successfully.",
+                file=sys.stderr,
+            )
+            return True
+        print(f"Chrome/Chromium PDF export timed out after {timeout}s before writing a PDF.", file=sys.stderr)
         return False
     except subprocess.CalledProcessError as exc:
+        output_was_written = pdf_path.exists() and pdf_path.stat().st_size > 1024
+        if output_was_written:
+            print(
+                f"Chrome/Chromium exited with {exc.returncode}, but a PDF was written successfully.",
+                file=sys.stderr,
+            )
+            return True
         print(f"Chrome/Chromium PDF export failed with exit code {exc.returncode}.", file=sys.stderr)
         return False
     finally:
@@ -594,7 +642,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("markdown", help="translated Markdown file")
     parser.add_argument("-o", "--output", help="output PDF path")
-    parser.add_argument("--html", help="output HTML path; defaults to PDF path with .html")
+    parser.add_argument("--html", help="also keep the intermediate HTML at this path")
     parser.add_argument("--title", help="HTML/PDF document title")
     parser.add_argument("--html-only", action="store_true", help="only write HTML, do not export PDF")
     parser.add_argument("--pdf-timeout", type=int, default=45, help="Chrome/Chromium PDF export timeout in seconds")
@@ -605,43 +653,79 @@ def main() -> int:
         raise FileNotFoundError(markdown_path)
 
     pdf_path = Path(args.output).expanduser().resolve() if args.output else markdown_path.with_suffix(".pdf")
-    html_path = Path(args.html).expanduser().resolve() if args.html else pdf_path.with_suffix(".html")
-    html_path.parent.mkdir(parents=True, exist_ok=True)
     pdf_path.parent.mkdir(parents=True, exist_ok=True)
+    keep_html = bool(args.html or args.html_only)
+    if args.html:
+        html_path = Path(args.html).expanduser().resolve()
+        html_path.parent.mkdir(parents=True, exist_ok=True)
+        temp_dir = None
+    elif args.html_only:
+        html_path = pdf_path.with_suffix(".html")
+        html_path.parent.mkdir(parents=True, exist_ok=True)
+        temp_dir = None
+    else:
+        temp_dir = tempfile.TemporaryDirectory(prefix="paper-md-html-")
+        html_path = Path(temp_dir.name) / f"{pdf_path.stem}.html"
 
     raw_markdown = markdown_path.read_text(encoding="utf-8")
     title = args.title or next((line.lstrip("# ").strip() for line in raw_markdown.splitlines() if line.startswith("# ")), markdown_path.stem)
     prepared_markdown = rewrite_image_paths(raw_markdown, markdown_path.parent)
+    contains_math = markdown_has_math(prepared_markdown)
     body = markdown_to_html(prepared_markdown)
     html_text = build_document(body, title)
     html_path.write_text(html_text, encoding="utf-8")
 
     if args.html_only:
         print(f"HTML written: {html_path}")
+        if temp_dir:
+            temp_dir.cleanup()
+        return 0
+
+    if contains_math and export_with_chrome(html_path, pdf_path, args.pdf_timeout):
+        print(f"PDF written with Chrome/Chromium: {pdf_path}")
+        if keep_html:
+            print(f"HTML written: {html_path}")
+        if temp_dir:
+            temp_dir.cleanup()
         return 0
 
     if export_with_weasyprint(html_text, html_path, pdf_path):
-        print(f"PDF written with WeasyPrint: {pdf_path}")
-        print(f"HTML written: {html_path}")
+        renderer = "WeasyPrint"
+        if contains_math:
+            renderer += " (MathJax JavaScript is not executed; install Chrome/Chromium for rendered math)"
+        print(f"PDF written with {renderer}: {pdf_path}")
+        if keep_html:
+            print(f"HTML written: {html_path}")
+        if temp_dir:
+            temp_dir.cleanup()
         return 0
 
-    if export_with_chrome(html_path, pdf_path, args.pdf_timeout):
+    if not contains_math and export_with_chrome(html_path, pdf_path, args.pdf_timeout):
         print(f"PDF written with Chrome/Chromium: {pdf_path}")
-        print(f"HTML written: {html_path}")
+        if keep_html:
+            print(f"HTML written: {html_path}")
+        if temp_dir:
+            temp_dir.cleanup()
         return 0
 
     if export_with_reportlab(raw_markdown, markdown_path, pdf_path, title):
         print(f"PDF written with ReportLab fallback: {pdf_path}")
-        print(f"HTML written: {html_path}")
+        if keep_html:
+            print(f"HTML written: {html_path}")
+        if temp_dir:
+            temp_dir.cleanup()
         return 0
 
-    print(f"HTML written: {html_path}")
+    if keep_html:
+        print(f"HTML preview written for debugging: {html_path}")
     print(
         "PDF export needs a working WeasyPrint or Chrome/Chromium backend. "
-        "Install WeasyPrint, fix the local browser backend, or open the HTML file "
-        "in a browser and print to PDF.",
+        "Install WeasyPrint, fix the local browser backend, or rerun with --html "
+        "only if you explicitly need an HTML debugging preview.",
         file=sys.stderr,
     )
+    if temp_dir:
+        temp_dir.cleanup()
     return 2
 
 
