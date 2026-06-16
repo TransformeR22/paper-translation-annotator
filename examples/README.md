@@ -21,7 +21,7 @@ Markdown 示例中使用的图表裁剪图存放在 `assets/<paper-slug>/figures
 python3 scripts/export_markdown_pdf.py examples/attention-is-all-you-need.md -o examples/attention-is-all-you-need.pdf
 ```
 
-也可以把输入文件换成另一个示例 Markdown。脚本会同时生成同名 HTML，便于检查 GitHub 无法稳定显示的公式、callout 和图表。
+也可以把输入文件换成另一个示例 Markdown。脚本默认只保留 Markdown 和 PDF；只有显式传入 `--html` 或 `--html-only` 时才保留 HTML。
 
 若需要稳定自动导出 PDF，建议先安装：
 
