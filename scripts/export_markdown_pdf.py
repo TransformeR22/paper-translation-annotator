@@ -78,13 +78,37 @@ def markdown_to_html(markdown_text: str) -> str:
     try:
         import markdown  # type: ignore
     except Exception:
-        return fallback_markdown_to_html(markdown_text)
+        return group_figures_in_html(fallback_markdown_to_html(markdown_text))
 
-    return markdown.markdown(
+    rendered = markdown.markdown(
         markdown_text,
         extensions=["extra", "tables", "fenced_code", "toc", "sane_lists"],
         output_format="html5",
     )
+    return group_figures_in_html(rendered)
+
+
+def group_figures_in_html(html_text: str) -> str:
+    paragraph_image_pattern = re.compile(
+        r'<p><img src="([^"]+)" alt="([^"]*)"\s*/?></p>\s*'
+        r'<p>(<strong>(?:Figure|Fig\.|Table|Algorithm)\s+.*?)</p>',
+        re.IGNORECASE | re.DOTALL,
+    )
+    figure_image_pattern = re.compile(
+        r'<figure><img src="([^"]+)" alt="([^"]*)"\s*/?></figure>\s*'
+        r'<p>(<strong>(?:Figure|Fig\.|Table|Algorithm)\s+.*?)</p>',
+        re.IGNORECASE | re.DOTALL,
+    )
+
+    def replace(match: re.Match[str]) -> str:
+        src, alt, caption = match.groups()
+        return (
+            f'<figure class="paper-figure"><img src="{src}" alt="{alt}">'
+            f"<figcaption>{caption}</figcaption></figure>"
+        )
+
+    html_text = paragraph_image_pattern.sub(replace, html_text)
+    return figure_image_pattern.sub(replace, html_text)
 
 
 def fallback_markdown_to_html(markdown_text: str) -> str:
@@ -281,7 +305,35 @@ blockquote {{ margin: 1em 0; padding: 0.1em 1em; border-left: 4px solid #94a3b8;
 .callout.tip {{ background: var(--tip); border-left-color: var(--tip-line); }}
 .callout.warning {{ background: var(--warning); border-left-color: var(--warning-line); }}
 img {{ max-width: 100%; height: auto; display: block; margin: 0.7em auto; }}
-figure {{ margin: 1.2em 0; break-inside: avoid; }}
+figure {{
+  margin: 1.2em 0;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}}
+figure.paper-figure {{
+  margin: 1.1em 0 1.25em;
+  display: inline-block;
+  width: 100%;
+  break-inside: auto;
+  page-break-inside: auto;
+}}
+figure.paper-figure img {{
+  margin-bottom: 0.45em;
+  max-width: 100%;
+  max-height: 105mm;
+  width: auto;
+  object-fit: contain;
+}}
+figcaption {{
+  color: var(--muted);
+  font-size: 0.92em;
+  line-height: 1.55;
+  text-align: left;
+  break-before: avoid;
+  page-break-before: avoid;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}}
 table {{ width: 100%; border-collapse: collapse; margin: 1em 0; font-size: 0.92em; break-inside: avoid; }}
 th, td {{ border: 1px solid var(--line); padding: 0.42em 0.55em; vertical-align: top; }}
 th {{ background: #f1f5f9; }}
@@ -290,7 +342,17 @@ code {{ font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; f
 @media print {{
   body {{ max-width: none; margin: 0; padding: 0; }}
   a {{ color: inherit; }}
-  h1, h2, h3 {{ break-after: avoid; }}
+  h1, h2, h3, h4, h5, h6 {{
+    break-after: avoid;
+    page-break-after: avoid;
+  }}
+  p, li, blockquote {{
+    orphans: 3;
+    widows: 3;
+  }}
+  figure.paper-figure img {{
+    max-height: 92mm;
+  }}
 }}
 </style>
 </head>
