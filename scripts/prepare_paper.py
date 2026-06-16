@@ -126,7 +126,8 @@ Institutions:
 
 ## TL;DR
 
-> [!IMPORTANT] 关键点
+> [!IMPORTANT]
+> **关键点**
 >
 
 ## Terms

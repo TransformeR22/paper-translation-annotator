@@ -170,7 +170,12 @@ def fallback_markdown_to_html(markdown_text: str) -> str:
             }
             continue
         if callout and line.startswith(">"):
-            callout["body"].append(line[1:].lstrip())  # type: ignore[index]
+            body_line = line[1:].lstrip()
+            title_match = re.match(r"^\*\*([^*]+)\*\*\s*$", body_line)
+            if title_match and str(callout["title"]).upper() in CALLOUT_CLASS:
+                callout["title"] = title_match.group(1)
+            else:
+                callout["body"].append(body_line)  # type: ignore[index]
             continue
         if callout:
             flush_callout()
@@ -443,7 +448,12 @@ def split_reportlab_paragraphs(markdown_text: str) -> list[dict[str, object]]:
             }
             continue
         if callout and line.startswith(">"):
-            callout["body"].append(line[1:].lstrip())  # type: ignore[index]
+            body_line = line[1:].lstrip()
+            title_match = re.match(r"^\*\*([^*]+)\*\*\s*$", body_line)
+            if title_match and str(callout["title"]).upper() in CALLOUT_CLASS:
+                callout["title"] = title_match.group(1)
+            else:
+                callout["body"].append(body_line)  # type: ignore[index]
             continue
         if callout:
             flush_callout()

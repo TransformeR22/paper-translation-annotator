@@ -82,9 +82,9 @@ If no PDF renderer is available, the script reports the missing dependency. Do n
 
 ````markdown
 ```math
-\operatorname{Attention}(Q,K,V)
+\mathrm{Attention}(Q,K,V)
 =
-\operatorname{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)V
+\mathrm{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)V
 ```
 
 **(1)**
@@ -94,6 +94,7 @@ If no PDF renderer is available, the script reports the missing dependency. Do n
 - Convert extracted plain-text approximations of formulas into valid LaTeX when the source formula is clear.
 - Keep Greek letters, superscripts, subscripts, square roots, fractions, matrix transposes, summations, and complexity notation in high-fidelity math form.
 - Do not use `\tag{...}` for equation numbers in final Markdown. It may render in VS Code extensions, but it is unreliable on GitHub. Put the equation number on its own line after the math block, for example `**(1)**`.
+- Do not use `\operatorname{...}` in GitHub-targeted Markdown. GitHub may reject it with "macros are not allowed". Prefer `\mathrm{...}` for function-like names, for example `\mathrm{softmax}` and `\mathrm{LayerNorm}`.
 - If formula extraction is uncertain, preserve the closest readable form and mark the uncertainty with a red annotation rather than silently simplifying it.
 
 ## Output Contract
@@ -126,7 +127,7 @@ Institutions: <institutions>
 ![Figure 1. Translated caption.](assets/<paper-slug>/figure-1.png)
 
 ```math
-Attention(Q,K,V)=\\operatorname{softmax}\\left(\\frac{QK^T}{\\sqrt{d_k}}\\right)V
+Attention(Q,K,V)=\\mathrm{softmax}\\left(\\frac{QK^T}{\\sqrt{d_k}}\\right)V
 ```
 
 **(1)**
@@ -140,7 +141,7 @@ Attention(Q,K,V)=\\operatorname{softmax}\\left(\\frac{QK^T}{\\sqrt{d_k}}\\right)
 
 ## Highlight Markup
 
-Use Markdown callout blocks for all annotations, including short annotations. This keeps the whole note visually highlighted while leaving formulas in Markdown text so MathJax/KaTeX can render them. Do not use raw HTML spans or divs for annotations. Use these callout types consistently:
+Use GitHub alert callout blocks for all annotations, including short annotations. This keeps the whole note visually highlighted while leaving formulas in Markdown text so GitHub math can render them. Do not use raw HTML spans or divs for annotations. Use these callout types consistently:
 
 - `[!IMPORTANT]` for core concepts, key claims, main contributions, and headline results.
 - `[!NOTE]` for methods, formulas, architecture, experiments, metrics, and algorithms.
@@ -148,18 +149,24 @@ Use Markdown callout blocks for all annotations, including short annotations. Th
 - `[!WARNING]` for limitations, assumptions, caveats, uncertainty, and possible misreadings.
 
 ```markdown
-> [!IMPORTANT] 关键点
+> [!IMPORTANT]
+> **关键点**
 > Transformer 的核心贡献是证明只用注意力也能成为强大的序列转导主干架构。
 
-> [!NOTE] 方法注
+> [!NOTE]
+> **方法注**
 > $QK^T$ 给出每个 query 对每个 key 的相似度；softmax 把相似度变成权重。
 
-> [!TIP] 读法提示
+> [!TIP]
+> **读法提示**
 > 先看 Table 1 理解 self-attention 的路径长度优势，再读模型细节。
 
-> [!WARNING] 注意
+> [!WARNING]
+> **注意**
 > 注意力可视化是定性证据，不等同于严格因果解释。
 ```
+
+The alert marker must be alone on its own line. Put the Chinese title on the next blockquote line in bold. Do not write `> [!IMPORTANT] 关键点`, because GitHub may display it as plain blockquote text instead of an alert.
 
 Keep annotation density useful: normally 1-3 annotations per dense section, more only for math-heavy or method-heavy parts.
 
@@ -185,6 +192,7 @@ Before final delivery, check:
 - The Markdown renders without broken HTML tags.
 - Display equations use fenced `math` blocks or plain `$$` blocks that GitHub can render.
 - Equation numbers are not written with `\tag{...}`; use standalone text such as `**(1)**` immediately after the equation.
+- GitHub-targeted math does not use blocked macros such as `\operatorname{...}`.
 - LaTeX math is not nested inside raw HTML blocks or inline HTML spans.
 - No `Color Legend` section is present unless the user explicitly asks for one.
 - The top title does not include `annotated translation`.
